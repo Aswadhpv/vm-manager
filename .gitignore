@@ -1,0 +1,10 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# VM images
+vm-images/
+
+# Logs
+logs/
