@@ -1,7 +1,11 @@
 # Python
 venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+*.sqlite3
 
 # VM images
 vm-images
@@ -9,7 +13,14 @@ vm-images
 # Logs
 logs/
 
-.idea
+# IDE files
+.idea/
+.vscode/
 
-__pycache__
+# OS junk
+.DS_Store
+Thumbs.db
 
+# VM Manager specific
+vm-images/
+*.qcow2
