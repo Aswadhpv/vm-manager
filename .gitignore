@@ -4,7 +4,12 @@ __pycache__/
 *.pyc
 
 # VM images
-vm-images/
+vm-images
 
 # Logs
 logs/
+
+.idea
+
+__pycache__
+
