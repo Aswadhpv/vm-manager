@@ -1,0 +1,31 @@
+---
+- name: Configure VM for student lab
+  hosts: lab_vms
+  become: true
+  tasks:
+    - name: Update all packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install required packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - ufw
+        - nginx
+        - python3-pip
+
+    - name: Configure firewall to allow only port 8080 from specific IP
+      ufw:
+        rule: allow
+        port: 8080
+        proto: tcp
+        from_ip: 192.168.22.11
+
+    - name: Copy lab scripts
+      copy:
+        src: /home/aswadh/vm-manager/lab_tasks/
+        dest: /home/student/lab_tasks/
+        mode: '0755'
