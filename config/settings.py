@@ -1,52 +1,118 @@
 import os
+from pathlib import Path
 
 # -----------------------------
-# Project Directories
+# Base paths
 # -----------------------------
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # vm-manager/
+BASE_DIR = Path(__file__).resolve().parent.parent  # project root: vm-manager/
 
-# Path to store VM images
-VM_STORAGE_PATH = os.path.join(BASE_DIR, "vm-images")
+# -----------------------------
+# VM image storage inside the project
+# -----------------------------
+VM_IMAGES_ROOT = BASE_DIR / "vm-images"
+VM_IMAGES_ROOT.mkdir(parents=True, exist_ok=True)
 
-# Base image (for cloning new VMs)
-BASE_IMAGE_PATH = os.path.join(VM_STORAGE_PATH, "base.qcow2")
+# base image folder
+BASE_IMAGE_DIR = VM_IMAGES_ROOT / "base"
+BASE_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+BASE_IMAGE_PATH = BASE_IMAGE_DIR / "base.qcow2"
+
+# per-VM disks (students + pool)
+VM_STORAGE_PATH = VM_IMAGES_ROOT / "instances"
+VM_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 
 # Backup directory (incremental snapshots)
-BACKUP_DIR = os.path.join(VM_STORAGE_PATH, "backups")
+BACKUP_DIR = VM_IMAGES_ROOT / "backups"
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 # -----------------------------
-# Logging Configuration
+# Logging
 # -----------------------------
-LOG_DIR = os.path.join(BASE_DIR, "logs")
-os.makedirs(LOG_DIR, exist_ok=True)
-LOG_FILE = os.path.join(LOG_DIR, "vm-manager.log")
+LOG_DIR = BASE_DIR / "log"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+LOG_FILE = LOG_DIR / "vm-manager.log"
+
+# SSH session recordings (asciinema-like .cast files)
+SSH_LOG_DIR = LOG_DIR / "ssh-sessions"
+SSH_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # -----------------------------
-# VM Defaults
+# VM defaults
 # -----------------------------
-DEFAULT_MEMORY_MB = 1024      # Default VM RAM in MB
-DEFAULT_VCPU = 1              # Default vCPU count
-DEFAULT_DISK_GB = 10          # Default disk size if not using cloning
-DEFAULT_NETWORK = "default"   # libvirt network
+DEFAULT_MEMORY_MB = int(os.getenv("VM_DEFAULT_MEMORY_MB", "1024"))
+DEFAULT_VCPU = int(os.getenv("VM_DEFAULT_VCPU", "1"))
+
+# Hot VM pool
+HOT_VM_POOL_SIZE = int(os.getenv("HOT_VM_POOL_SIZE", "3"))
 
 # -----------------------------
-# Hypervisor / libvirt URI
+# Hypervisor / libvirt
 # -----------------------------
-# Local KVM
-LIBVIRT_URI = "qemu:///system"
+HYPERVISOR_TYPE = os.getenv("HYPERVISOR_TYPE", "qemu").lower()
 
-# -----------------------------
-# VM Pool Config
-# -----------------------------
-HOT_VM_POOL_SIZE = 3          # Number of pre-created "hot" VMs
+# common examples:
+#   qemu:///system                  (KVM/QEMU on host)
+#   xen:///system                   (Xen)
+#   vpx:///system                   (VMware vSphere/ESXi)
+#   hyperv:///system                (Hyper-V)
+#   qemu+ssh://root@proxmox/system  (Proxmox)
+LIBVIRT_URI = os.getenv("LIBVIRT_URI", "qemu:///system")
+
+HYPERVISOR_CONFIG = {
+    "qemu": {
+        "uri": os.getenv("LIBVIRT_QEMU_URI", LIBVIRT_URI),
+    },
+    "kvm": {
+        "uri": os.getenv("LIBVIRT_KVM_URI", LIBVIRT_URI),
+    },
+    "hyperv": {
+        "uri": os.getenv("LIBVIRT_HYPERV_URI", LIBVIRT_URI),
+    },
+    "vmware": {
+        "uri": os.getenv("LIBVIRT_VMWARE_URI", LIBVIRT_URI),
+    },
+    "xen": {
+        "uri": os.getenv("LIBVIRT_XEN_URI", LIBVIRT_URI),
+    },
+    "proxmox": {
+        "uri": os.getenv("LIBVIRT_PROXMOX_URI", LIBVIRT_URI),
+    },
+}
 
 # -----------------------------
 # Automation / Ansible
 # -----------------------------
-ANSIBLE_HOSTS_FILE = os.path.expanduser("~/vm-manager/ansible/hosts.ini")
-ANSIBLE_PLAYBOOK = os.path.expanduser("~/vm-manager/ansible/playbooks/configure_vm.yml")
+ANSIBLE_HOSTS_FILE = os.getenv(
+    "ANSIBLE_HOSTS_FILE",
+    str(BASE_DIR / "ansible" / "hosts.ini"),
+)
+
+ANSIBLE_PLAYBOOK = os.getenv(
+    "ANSIBLE_PLAYBOOK",
+    str(BASE_DIR / "ansible" / "playbooks" / "configure_vm.yml"),
+)
+
+# -----------------------------
+# SSH / terminal access
+# -----------------------------
+VM_SSH_HOST_TEMPLATE = os.getenv("VM_SSH_HOST_TEMPLATE", "{name}")
+VM_SSH_PORT = int(os.getenv("VM_SSH_PORT", "22"))
+VM_SSH_USERNAME = os.getenv("VM_SSH_USERNAME", "student")
+VM_SSH_KNOWN_HOSTS = os.getenv("VM_SSH_KNOWN_HOSTS", None)
+
+VM_SSH_PRIVATE_KEY = os.getenv(
+    "VM_SSH_PRIVATE_KEY",
+    str(Path.home() / ".ssh" / "id_rsa"),
+)
+
+# -----------------------------
+# Metrics / monitoring
+# -----------------------------
+METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() == "true"
+METRICS_REFRESH_INTERVAL = int(os.getenv("METRICS_REFRESH_INTERVAL", "5"))
 
 # -----------------------------
 # Misc
 # -----------------------------
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "true").lower() == "true"

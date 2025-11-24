@@ -2,6 +2,7 @@
 - name: Configure VM for student lab
   hosts: lab_vms
   become: true
+
   tasks:
     - name: Update all packages
       apt:
@@ -16,6 +17,10 @@
         - ufw
         - nginx
         - python3-pip
+        - git
+        - curl
+        - htop
+        - net-tools
 
     - name: Configure firewall to allow only port 8080 from specific IP
       ufw:
@@ -26,6 +31,7 @@
 
     - name: Copy lab scripts
       copy:
-        src: /home/aswadh/vm-manager/lab_tasks/
+        # relative to this playbook directory
+        src: "{{ playbook_dir }}/lab_tasks/"
         dest: /home/student/lab_tasks/
-        mode: '0755'
+        mode: "0755"
