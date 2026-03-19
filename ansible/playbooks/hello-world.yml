@@ -1,0 +1,9 @@
+---
+- name: Test Playbook
+  hosts: all
+  become: true
+  tasks:
+    - name: Create a test file
+      copy:
+        dest: /tmp/hello.txt
+        content: 'Hello from Ansible and Cloud-Init!'

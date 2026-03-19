@@ -318,14 +318,26 @@ class VMController:
             pass
 
         try:
-            disk_path = str(VM_STORAGE_PATH / f"{name}.qcow2")
-            iso_path = str(CLOUD_INIT_DIR / f"{name}-cidata.iso")
-
+            # 1. Undefine the domain from libvirt
             dom.undefineFlags(libvirt.VIR_DOMAIN_UNDEFINE_MANAGED_SAVE)
-            if os.path.exists(disk_path): os.remove(disk_path)
-            if os.path.exists(iso_path): os.remove(iso_path)
 
-            log_event(f"[vm] Deleted VM '{name}' and attached disks")
+            # 2. Smart cleanup: Delete base disk AND any snapshot overlays
+            import glob
+            disk_pattern = str(VM_STORAGE_PATH / f"{name}*")
+            for file_path in glob.glob(disk_pattern):
+                try:
+                    os.remove(file_path)
+                    log_event(f"[vm] Deleted disk/snapshot file: {file_path}")
+                except OSError as e:
+                    log_event(f"[vm] Failed to delete file {file_path}: {e}")
+
+            # 3. Clean up the cloud-init ISO
+            iso_path = str(CLOUD_INIT_DIR / f"{name}-cidata.iso")
+            if os.path.exists(iso_path):
+                os.remove(iso_path)
+                log_event(f"[vm] Deleted cloud-init ISO: {iso_path}")
+
+            log_event(f"[vm] Completely deleted VM '{name}' and all attached storage")
         except libvirt.libvirtError as e:
             raise HTTPException(status_code=500, detail=f"Failed to delete VM '{name}': {e}") from e
 
