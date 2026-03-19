@@ -15,11 +15,15 @@ VM_IMAGES_ROOT.mkdir(parents=True, exist_ok=True)
 # base image folder
 BASE_IMAGE_DIR = VM_IMAGES_ROOT / "base"
 BASE_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-BASE_IMAGE_PATH = BASE_IMAGE_DIR / "base.qcow2"
+DEFAULT_BASE_IMAGE = os.getenv("DEFAULT_BASE_IMAGE", "base.qcow2")
 
 # per-VM disks (students + pool)
 VM_STORAGE_PATH = VM_IMAGES_ROOT / "instances"
 VM_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
+
+# Cloud-init ISO storage
+CLOUD_INIT_DIR = VM_IMAGES_ROOT / "cloud-init"
+CLOUD_INIT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Backup directory (incremental snapshots)
 BACKUP_DIR = VM_IMAGES_ROOT / "backups"
@@ -60,24 +64,12 @@ HYPERVISOR_TYPE = os.getenv("HYPERVISOR_TYPE", "qemu").lower()
 LIBVIRT_URI = os.getenv("LIBVIRT_URI", "qemu:///system")
 
 HYPERVISOR_CONFIG = {
-    "qemu": {
-        "uri": os.getenv("LIBVIRT_QEMU_URI", LIBVIRT_URI),
-    },
-    "kvm": {
-        "uri": os.getenv("LIBVIRT_KVM_URI", LIBVIRT_URI),
-    },
-    "hyperv": {
-        "uri": os.getenv("LIBVIRT_HYPERV_URI", LIBVIRT_URI),
-    },
-    "vmware": {
-        "uri": os.getenv("LIBVIRT_VMWARE_URI", LIBVIRT_URI),
-    },
-    "xen": {
-        "uri": os.getenv("LIBVIRT_XEN_URI", LIBVIRT_URI),
-    },
-    "proxmox": {
-        "uri": os.getenv("LIBVIRT_PROXMOX_URI", LIBVIRT_URI),
-    },
+    "qemu": {"uri": os.getenv("LIBVIRT_QEMU_URI", LIBVIRT_URI)},
+    "kvm": {"uri": os.getenv("LIBVIRT_KVM_URI", LIBVIRT_URI)},
+    "hyperv": {"uri": os.getenv("LIBVIRT_HYPERV_URI", LIBVIRT_URI)},
+    "vmware": {"uri": os.getenv("LIBVIRT_VMWARE_URI", LIBVIRT_URI)},
+    "xen": {"uri": os.getenv("LIBVIRT_XEN_URI", LIBVIRT_URI)},
+    "proxmox": {"uri": os.getenv("LIBVIRT_PROXMOX_URI", LIBVIRT_URI)},
 }
 
 # -----------------------------
@@ -88,10 +80,8 @@ ANSIBLE_HOSTS_FILE = os.getenv(
     str(BASE_DIR / "ansible" / "hosts.ini"),
 )
 
-ANSIBLE_PLAYBOOK = os.getenv(
-    "ANSIBLE_PLAYBOOK",
-    str(BASE_DIR / "ansible" / "playbooks" / "configure_vm.yml"),
-)
+PLAYBOOKS_DIR = BASE_DIR / "ansible" / "playbooks"
+PLAYBOOKS_DIR.mkdir(parents=True, exist_ok=True)
 
 # -----------------------------
 # SSH / terminal access

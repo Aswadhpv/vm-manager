@@ -50,6 +50,9 @@ To reduce wait time (like AWS/GCP do), the system maintains a pool of pre‑warm
 - Endpoint:
   - `/pool/status`
   - `/pool/allocate`
+  - `/pool/status`
+  - `/pool/allocate`
+  - `/pool/capacity` (PUT: Dynamically scale the pool size up or down)
 
 This aligns with the thesis argument:
 
@@ -120,10 +123,27 @@ Ansible Playbook:
 ansible/playbooks/configure_vm.yml
 ```
 
+**Dynamic Playbook Management:**
+The system now features a full CRUD API for managing Ansible playbooks on the fly. You can upload lab instructions (e.g., `docker-lab.yml`) via the API and pass them as a list when creating a VM. The backend will execute them sequentially.
+
+Endpoints:
+- `GET /playbooks`
+- `POST /playbooks`
+- `PUT /playbooks/{name}`
+- `DELETE /playbooks/{name}`
+
 Includes:
 - Package install
 - UFW configuration
 - Lab file deployment
+
+---
+
+## ✅ 8. Dynamic Base Images & Cloud-Init Bootstrap
+The system supports multiple OS distributions (Ubuntu, Debian, Fedora, Arch) dynamically. 
+- Pass a `base_image` parameter during VM creation to select the OS.
+- The backend automatically uses `cloud-localds` to generate a `cidata.iso` virtual CD-ROM.
+- This cloud-init injection securely sets up the default SSH user (`student`) and password on the very first boot, allowing Ansible to connect immediately without manual intervention.
 
 ---
 
@@ -155,7 +175,7 @@ Install essential packages:
 
 ```bash
 sudo apt update
-sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtinst python3-venv python3-pip ansible
+sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtinst python3-venv python3-pip ansible cloud-image-utils
 sudo systemctl enable --now libvirtd
 ```
 
@@ -244,6 +264,11 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 | `/pool/status`       | GET    | Get status of hot VM pool                           |
 | `/pool/allocate`     | POST   | Get an available hot VM from pool                   |
 | `/metrics`           | GET    | Get Monitoring metrics                              |
+| `/pool/capacity`     | PUT    | Dynamically scale the hot VM pool size up or down   |
+| `/playbooks`         | GET    | List all available Ansible playbooks                |
+| `/playbooks`         | POST   | Upload a new Ansible playbook                       |
+| `/playbooks/{name}`  | PUT    | Update an existing Ansible playbook                 |
+| `/playbooks/{name}`  | DELETE | Delete an Ansible playbook                          |
 | `/ansible/auth`      | POST   | Post the auth password or sudo password if user has |
 | `/ansible/clear`     | POST   | Recover the auth password if user forget            |
 
