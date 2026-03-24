@@ -232,10 +232,18 @@ async def vm_terminal(websocket: WebSocket, name: str):
             "vm_name": name, "owner": owner
         }) + "\n")
         try:
+            # Safely check if the SSH key actually exists on the hard drive
+            import os
+            key_path = ssh_target.get("key_path")
+            valid_keys = [key_path] if key_path and os.path.exists(key_path) else None
+
+            # Connect using the password injected by Cloud-Init
             conn = await asyncssh.connect(
-                host=ssh_target["host"], port=ssh_target["port"],
+                host=ssh_target["host"],
+                port=ssh_target["port"],
                 username=ssh_target["username"],
-                client_keys=[ssh_target.get("key_path")] if ssh_target.get("key_path") else None,
+                password="student",
+                client_keys=valid_keys,
                 known_hosts=None
             )
             process = await conn.create_process()
