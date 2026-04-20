@@ -32,25 +32,24 @@ from core.ansible_auth import AnsibleAuthManager
 
 def _libvirt_error_handler(ctx, error):
     """
-        Custom libvirt error handler to suppress noisy stderr messages like:
-        'Domain not found: no domain with matching name ...'
-        """
-    # You could add selective logging here if you want.
+    Custom libvirt error handler to suppress noisy stderr messages like:
+    'Domain not found: no domain with matching name ...'
+    """
     pass
 
 
 class VMController:
     """
-        Core VM lifecycle operations, abstracted over libvirt.
+    Core VM lifecycle operations, abstracted over libvirt.
 
-        By switching LIBVIRT_URI (and HYPERVISOR_TYPE) in config/settings.py,
-        this controller can talk to:
+    By switching LIBVIRT_URI (and HYPERVISOR_TYPE) in config/settings.py,
+    this controller can talk to:
 
-            * QEMU / KVM
-            * Hyper-V (via libvirt hyperv driver)
-            * VMware (via vpx driver)
-            * Xen
-            * Proxmox (KVM, exposed via libvirt)
+        * QEMU / KVM
+        * Hyper-V (via libvirt hyperv driver)
+        * VMware (via vpx driver)
+        * Xen
+        * Proxmox (KVM, exposed via libvirt)
     """
 
     def __init__(self) -> None:
@@ -112,15 +111,28 @@ class VMController:
 
             meta_data_path.write_text(f"instance-id: {name}\nlocal-hostname: {name}\n")
 
-            # Basic user-data to set up default user for Ansible/SSH access
-            user_data_path.write_text(
-                "#cloud-config\n"
-                "ssh_pwauth: true\n"
-                "chpasswd:\n"
-                "  list: |\n"
-                f"    {VM_SSH_USERNAME}:student\n"
-                "  expire: False\n"
-            )
+            # Explicit user-data to bypass strict OS security defaults and allow SSH passwords
+            user_data = f"""#cloud-config
+hostname: {name}
+manage_etc_hosts: true
+
+# This forces the SSH service to accept passwords
+ssh_pwauth: true
+
+users:
+  - name: {VM_SSH_USERNAME}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    home: /home/{VM_SSH_USERNAME}
+    shell: /bin/bash
+    lock_passwd: false
+
+chpasswd:
+  list: |
+    {VM_SSH_USERNAME}:student
+  expire: False
+"""
+            user_data_path.write_text(user_data)
 
             try:
                 subprocess.run(
@@ -139,7 +151,7 @@ class VMController:
             name: str, vm_uuid: str, vm_image: str, cloud_init_iso: str, memory_mb: int, vcpus: int
     ) -> str:
         """
-                Minimal domain XML definition suitable for QEMU/KVM style hypervisors.
+        Minimal domain XML definition suitable for QEMU/KVM style hypervisors.
         """
 
         return f"""
@@ -231,11 +243,11 @@ class VMController:
 
     def start_vm(self, name: str) -> None:
         """
-                Start VM.
+        Start VM.
 
-                - If the VM is already running -> raise 409 with a clear message.
-                - If paused -> resume.
-                - If shut off / crashed / no state -> start.
+        - If the VM is already running -> raise 409 with a clear message.
+        - If paused -> resume.
+        - If shut off / crashed / no state -> start.
         """
         dom = self._get_domain(name)
         try:
@@ -256,15 +268,15 @@ class VMController:
 
     def stop_vm(self, name: str) -> None:
         """
-                Stop a VM.
+        Stop a VM.
 
-                Strategy:
-                - If VM is already shut off -> no-op, treat as success.
-                - Otherwise:
-                    1) Best-effort snapshot
-                    2) Try graceful shutdown (ACPI)
-                    3) Wait a bit for it to actually stop
-                    4) If still running, force poweroff with destroy()
+        Strategy:
+        - If VM is already shut off -> no-op, treat as success.
+        - Otherwise:
+            1) Best-effort snapshot
+            2) Try graceful shutdown (ACPI)
+            3) Wait a bit for it to actually stop
+            4) If still running, force poweroff with destroy()
         """
         dom = self._get_domain(name)
         # Check current state first
@@ -365,12 +377,12 @@ class VMController:
 
     def configure_vm_with_ansible(self, vm_name: str, playbooks: list[str]) -> None:
         """
-                Run ansible playbook to configure the VM.
+        Run ansible playbook to configure the VM.
 
-                - Uses in-memory stored sudo/become password if provided via
-                  AnsibleAuthManager.
-                - If no password is provided, it runs as usual, which works on
-                  hosts with passwordless sudo.
+        - Uses in-memory stored sudo/become password if provided via
+          AnsibleAuthManager.
+        - If no password is provided, it runs as usual, which works on
+          hosts with passwordless sudo.
         """
         if not playbooks:
             log_event(f"[ansible] No playbooks specified for {vm_name}. Skipping.")
