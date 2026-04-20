@@ -1,65 +1,125 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>VM Terminal (Direct IP Mode)</title>
+    <title>Multi-VM Terminal Dashboard</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <style>
-        body { background-color: #111; color: white; font-family: sans-serif; padding: 20px; }
-        #terminal { width: 800px; height: 400px; margin-top: 20px; border: 1px solid #333; }
-        input { padding: 10px; font-size: 16px; margin-right: 10px; margin-bottom: 10px; width: 250px; }
-        button { padding: 10px; font-size: 16px; cursor: pointer; }
-        .form-group { display: flex; align-items: center; }
+        body { background-color: #1a1b26; color: white; font-family: sans-serif; padding: 20px; margin: 0; }
+        .control-panel { background-color: #24283b; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+        input { padding: 10px; font-size: 14px; background: #1a1b26; color: white; border: 1px solid #414868; border-radius: 4px; }
+        button { padding: 10px 15px; font-size: 14px; cursor: pointer; background-color: #7aa2f7; color: #1a1b26; border: none; border-radius: 4px; font-weight: bold; transition: 0.2s; }
+        button:hover { background-color: #89b4fa; }
+
+        /* The Grid for Multiple Terminals */
+        #terminal-grid { display: flex; flex-wrap: wrap; gap: 20px; }
+
+        /* Individual Terminal Window */
+        .term-wrapper { background: #000; border: 1px solid #414868; border-radius: 8px; overflow: hidden; width: 650px; display: flex; flex-direction: column; }
+        .term-header { background: #414868; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-family: monospace; }
+        .close-btn { background: #f7768e; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; padding: 0; }
+        .close-btn:hover { background: #db4b4b; }
+
+        /* Removed padding here so the FitAddon can use 100% of the space safely */
+        .term-container { height: 350px; width: 100%; overflow: hidden; }
     </style>
 </head>
 <body>
-    <h2>WebSocket Terminal (SSH Tunnel)</h2>
+    <h2>☁️ Multi-VM Console</h2>
 
-    <div class="form-group">
-        <input type="text" id="vmName" placeholder="VM Name (e.g. test-ubuntu)">
+    <div class="control-panel">
+        <input type="text" id="vmName" placeholder="VM Name (e.g. pool-vm-1)">
         <input type="text" id="vmIp" placeholder="VM IP Address (e.g. 192.168.122.50)">
-        <button onclick="connect()">Connect</button>
+        <button onclick="spawnTerminal()">+ Add Terminal</button>
     </div>
 
-    <div id="terminal"></div>
+    <div id="terminal-grid"></div>
 
     <script>
-        let currentWs = null;
+        // Keep track of active sessions
+        let sessionCounter = 0;
+        // Keep track of fit addons to resize them if the browser window changes
+        const fitAddons = [];
 
-        function connect() {
+        function spawnTerminal() {
             const vm = document.getElementById('vmName').value;
             const ip = document.getElementById('vmIp').value;
 
-            if (!vm) return alert("Please enter a VM name!");
-            if (!ip) return alert("Please enter the VM IP address!");
+            if (!vm || !ip) return alert("Please enter both a VM name and IP address!");
 
-            // Close existing connection if there is one
-            if (currentWs) {
-                currentWs.close();
-            }
+            sessionCounter++;
+            const sessionId = `term-${sessionCounter}`;
 
-            const term = new Terminal({ cursorBlink: true });
-            document.getElementById('terminal').innerHTML = "";
-            term.open(document.getElementById('terminal'));
+            // 1. Create the UI Wrapper
+            const grid = document.getElementById('terminal-grid');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'term-wrapper';
+            wrapper.id = sessionId;
 
-            // Append both owner and the IP directly to the connection string
+            wrapper.innerHTML = `
+                <div class="term-header">
+                    <span>🖥️ ${vm} (${ip})</span>
+                    <button class="close-btn" onclick="closeTerminal('${sessionId}')">✖</button>
+                </div>
+                <div class="term-container" id="container-${sessionId}"></div>
+            `;
+            grid.appendChild(wrapper);
+
+            // 2. Initialize xterm.js and the FitAddon
+            const term = new Terminal({
+                cursorBlink: true,
+                theme: { background: '#000000' }
+            });
+
+            const fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+
+            term.open(document.getElementById(`container-${sessionId}`));
+
+            // Force the terminal to perfectly fit the CSS box
+            fitAddon.fit();
+            fitAddons.push({ id: sessionId, addon: fitAddon });
+
+            // 3. Connect the WebSocket
             const wsUrl = `ws://localhost:8000/ws/vm/${vm}/terminal?owner=thesis-tester&ip=${ip}`;
+            term.writeln(`\x1b[36mConnecting to ${vm}...\x1b[0m`);
 
-            term.writeln(`\x1b[36mConnecting to ${wsUrl}...\x1b[0m`);
+            const ws = new WebSocket(wsUrl);
+            wrapper.ws = ws;
 
-            currentWs = new WebSocket(wsUrl);
+            ws.onopen = () => term.writeln('\x1b[32mConnected! Waiting for prompt...\x1b[0m\r\n');
+            ws.onerror = () => term.writeln('\x1b[31m\r\nConnection Error.\x1b[0m');
+            ws.onclose = () => term.writeln('\x1b[33m\r\nConnection Closed\x1b[0m');
 
-            currentWs.onopen = () => term.writeln('\x1b[32mWebSocket Connected! Waiting for SSH prompt...\x1b[0m\r\n');
-            currentWs.onerror = (e) => term.writeln('\x1b[31m\r\nWebSocket Error. Check server logs.\x1b[0m');
-            currentWs.onclose = () => term.writeln('\x1b[33m\r\nConnection Closed\x1b[0m');
-
-            currentWs.onmessage = (event) => term.write(event.data);
+            ws.onmessage = (event) => term.write(event.data);
             term.onData((data) => {
-                if (currentWs.readyState === WebSocket.OPEN) {
-                    currentWs.send(data);
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(data);
                 }
             });
+
+            // Clear the inputs
+            document.getElementById('vmName').value = '';
+            document.getElementById('vmIp').value = '';
         }
+
+        function closeTerminal(sessionId) {
+            const wrapper = document.getElementById(sessionId);
+            if (wrapper) {
+                if (wrapper.ws) wrapper.ws.close();
+                wrapper.remove();
+            }
+        }
+
+        // If you resize your browser window, tell all terminals to recalculate their size
+        window.addEventListener('resize', () => {
+            fitAddons.forEach(item => {
+                if (document.getElementById(item.id)) {
+                    item.addon.fit();
+                }
+            });
+        });
     </script>
 </body>
 </html>
