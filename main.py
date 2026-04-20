@@ -217,13 +217,20 @@ async def _proxy_ssh_to_websocket(websocket: WebSocket, ssh_process, log_file):
 
 @app.websocket("/ws/vm/{name}/terminal")
 async def vm_terminal(websocket: WebSocket, name: str):
+    # Retrieve owner and the newly added IP from the query parameters
     owner = websocket.query_params.get("owner", None)
+    ip = websocket.query_params.get("ip", None)
+
     await websocket.accept()
     record_ssh_session_change(owner, name, +1)
 
     session_id = str(uuid.uuid4())
     log_path = SSH_LOG_DIR / f"{session_id}.cast"
     ssh_target = vm_controller.get_vm_ssh_target(name)
+
+    # Use the manually provided IP if it exists, otherwise fall back to Libvirt target
+    target_host = ip if ip else ssh_target["host"]
+    print(f"DEBUG: Attempting SSH connection to {target_host} on port {ssh_target['port']}")
 
     with open(log_path, "w", encoding="utf-8") as f:
         f.write(json.dumps({
@@ -237,9 +244,9 @@ async def vm_terminal(websocket: WebSocket, name: str):
             key_path = ssh_target.get("key_path")
             valid_keys = [key_path] if key_path and os.path.exists(key_path) else None
 
-            # Connect using the password injected by Cloud-Init
+            # Connect using the overridden target_host
             conn = await asyncssh.connect(
-                host=ssh_target["host"],
+                host=target_host,
                 port=ssh_target["port"],
                 username=ssh_target["username"],
                 password="student",
@@ -253,6 +260,7 @@ async def vm_terminal(websocket: WebSocket, name: str):
             ], return_when=asyncio.FIRST_COMPLETED)
         except Exception as e:
             await websocket.send_text(f"SSH Error: {e}")
+            print(f"DEBUG SSH Error: {e}")
         finally:
             record_ssh_session_change(owner, name, -1)
             record_vm_activity(owner)

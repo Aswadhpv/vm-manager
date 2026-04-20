@@ -179,6 +179,13 @@ sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtinst pyth
 sudo systemctl enable --now libvirtd
 ```
 
+If have some error with libvirt use this command to install manually
+
+```bash 
+sudo apt install pkg-config libvirt-dev libvirt-daemon-system
+pkg-config --modversion libvirt
+pip install libvirt-python
+```
 ---
 
 ## Project Setup
@@ -243,16 +250,35 @@ POST /vms/create
 
 ## Running the Project
 
-1. **Start the FastAPI server**
+1. **Start the FastAPI server locally**
 
+**Locally**
 ```bash
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+**In the Server**
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+2. **Connect to server using ssh in the format username@ipaddress**
+
+**Connect to server**
+```bash
+ssh username@Ipaddress
+```
+
+**Connecting within server**
+```bash
+ssh -L 8000:localhost:8000 apv@192.168.1.187
+```
+
 * The API will be available at: `http://localhost:8000`
 * Swagger UI for API testing: `http://localhost:8000/docs`
+* Server Swagger UI for API testing `http://Ipaddress:8000/docs`
 
-2. **VM Management Endpoints**
+3. **VM Management Endpoints**
 
 | Endpoint             | Method | Description                                         |
 |----------------------|--------|-----------------------------------------------------|

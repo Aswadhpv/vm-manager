@@ -1,43 +1,63 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>VM Terminal (Tunnel Mode)</title>
+    <title>VM Terminal (Direct IP Mode)</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <style>
         body { background-color: #111; color: white; font-family: sans-serif; padding: 20px; }
         #terminal { width: 800px; height: 400px; margin-top: 20px; border: 1px solid #333; }
-        input, button { padding: 10px; font-size: 16px; margin-right: 10px; }
+        input { padding: 10px; font-size: 16px; margin-right: 10px; margin-bottom: 10px; width: 250px; }
+        button { padding: 10px; font-size: 16px; cursor: pointer; }
+        .form-group { display: flex; align-items: center; }
     </style>
 </head>
 <body>
     <h2>WebSocket Terminal (SSH Tunnel)</h2>
-    <input type="text" id="vmName" placeholder="VM Name (e.g. thesis-demo)">
-    <button onclick="connect()">Connect via WebSocket</button>
+
+    <div class="form-group">
+        <input type="text" id="vmName" placeholder="VM Name (e.g. test-ubuntu)">
+        <input type="text" id="vmIp" placeholder="VM IP Address (e.g. 192.168.122.50)">
+        <button onclick="connect()">Connect</button>
+    </div>
 
     <div id="terminal"></div>
 
     <script>
+        let currentWs = null;
+
         function connect() {
             const vm = document.getElementById('vmName').value;
+            const ip = document.getElementById('vmIp').value;
+
             if (!vm) return alert("Please enter a VM name!");
+            if (!ip) return alert("Please enter the VM IP address!");
+
+            // Close existing connection if there is one
+            if (currentWs) {
+                currentWs.close();
+            }
 
             const term = new Terminal({ cursorBlink: true });
-            document.getElementById('terminal').innerHTML = ""; 
+            document.getElementById('terminal').innerHTML = "";
             term.open(document.getElementById('terminal'));
-            
-            term.writeln(`\x1b[36mConnecting to ws://localhost:8000/ws/vm/${vm}/terminal...\x1b[0m`);
 
-            // Connects through your local laptop's SSH tunnel directly to the server
-            const ws = new WebSocket(`ws://localhost:8000/ws/vm/${vm}/terminal?owner=thesis-tester`);
+            // Append both owner and the IP directly to the connection string
+            const wsUrl = `ws://localhost:8000/ws/vm/${vm}/terminal?owner=thesis-tester&ip=${ip}`;
 
-            ws.onopen = () => term.writeln('\x1b[32mWebSocket Connected! Waiting for SSH prompt...\x1b[0m\r\n');
-            ws.onerror = (e) => term.writeln('\x1b[31m\r\nWebSocket Error. Is the VM running?\x1b[0m');
-            ws.onclose = () => term.writeln('\x1b[33m\r\nConnection Closed\x1b[0m');
+            term.writeln(`\x1b[36mConnecting to ${wsUrl}...\x1b[0m`);
 
-            ws.onmessage = (event) => term.write(event.data);
+            currentWs = new WebSocket(wsUrl);
+
+            currentWs.onopen = () => term.writeln('\x1b[32mWebSocket Connected! Waiting for SSH prompt...\x1b[0m\r\n');
+            currentWs.onerror = (e) => term.writeln('\x1b[31m\r\nWebSocket Error. Check server logs.\x1b[0m');
+            currentWs.onclose = () => term.writeln('\x1b[33m\r\nConnection Closed\x1b[0m');
+
+            currentWs.onmessage = (event) => term.write(event.data);
             term.onData((data) => {
-                if (ws.readyState === WebSocket.OPEN) ws.send(data);
+                if (currentWs.readyState === WebSocket.OPEN) {
+                    currentWs.send(data);
+                }
             });
         }
     </script>
