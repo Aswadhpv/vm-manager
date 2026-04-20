@@ -197,8 +197,16 @@ chpasswd:
         try:
             dom = self._get_domain(name)
             if dom.isActive():
-                # Ask libvirt for network leases (waits for DHCP)
-                ifaces = dom.interfaceAddresses(libvirt.VIR_DOMAIN_INTERFACE_ADDRESS_SRCH_LEASE, 0)
+                # We use a try-except block to handle different versions of libvirt-python
+                try:
+                    # The official constant (Addresses, Src)
+                    source = libvirt.VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_LEASE
+                except AttributeError:
+                    # Fallback to the raw integer value (1) if the constant is missing
+                    source = 1
+
+                    # Ask libvirt for network leases (waits for DHCP)
+                ifaces = dom.interfaceAddresses(source, 0)
                 for (iface, val) in ifaces.items():
                     if val.get('addrs'):
                         for addr in val['addrs']:
