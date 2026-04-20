@@ -210,10 +210,17 @@ async def _proxy_websocket_to_ssh(websocket: WebSocket, ssh_process, log_file):
 
 
 async def _proxy_ssh_to_websocket(websocket: WebSocket, ssh_process, log_file):
-    async for data in ssh_process.stdout:
-        log_file.write(json.dumps([time.time(), "o", data]) + "\n")
-        await websocket.send_text(data)
-
+    # Instead of waiting for lines, we read real-time chunks
+    while True:
+        try:
+            # Read up to 4096 bytes instantly
+            data = await ssh_process.stdout.read(4096)
+            if not data:
+                break
+            log_file.write(json.dumps([time.time(), "o", data]) + "\n")
+            await websocket.send_text(data)
+        except Exception:
+            break
 
 @app.websocket("/ws/vm/{name}/terminal")
 async def vm_terminal(websocket: WebSocket, name: str):

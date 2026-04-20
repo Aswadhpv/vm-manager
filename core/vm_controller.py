@@ -192,6 +192,22 @@ chpasswd:
         except libvirt.libvirtError:
             raise HTTPException(status_code=404, detail=f"VM '{name}' not found")
 
+    def get_vm_ip(self, name: str) -> Optional[str]:
+        """Queries Libvirt's DHCP server for the VM's assigned IP."""
+        try:
+            dom = self._get_domain(name)
+            if dom.isActive():
+                # Ask libvirt for network leases (waits for DHCP)
+                ifaces = dom.interfaceAddresses(libvirt.VIR_DOMAIN_INTERFACE_ADDRESS_SRCH_LEASE, 0)
+                for (iface, val) in ifaces.items():
+                    if val.get('addrs'):
+                        for addr in val['addrs']:
+                            if addr['type'] == libvirt.VIR_IP_ADDR_TYPE_IPV4:
+                                return addr['addr']
+        except libvirt.libvirtError:
+            pass
+        return None
+
     # ------------------------------------------------------------------
     # Public VM operations
     # ------------------------------------------------------------------
@@ -237,6 +253,7 @@ chpasswd:
                 "memory_mb": memory_mb,
                 "vcpus": vcpus,
                 "owner": owner,
+                "ip": None # Will populate once the VM boots and requests a DHCP lease
             }
         except libvirt.libvirtError as e:
             raise HTTPException(status_code=500, detail=f"libvirt error: {e}") from e
@@ -359,13 +376,15 @@ chpasswd:
         for dom in domains:
             try:
                 info = dom.info()
+                name = dom.name()
                 vms.append({
-                    "name": dom.name(),
+                    "name": name,
                     "id": dom.ID(),
                     "state": info[0],
                     "max_memory": info[1],
                     "memory": info[2],
                     "vcpus": info[3],
+                    "ip": self.get_vm_ip(name)  # Automatically fetches the IP
                 })
             except libvirt.libvirtError:
                 continue
