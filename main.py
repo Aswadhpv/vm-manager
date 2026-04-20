@@ -253,7 +253,7 @@ async def vm_terminal(websocket: WebSocket, name: str):
                 client_keys=valid_keys,
                 known_hosts=None
             )
-            process = await conn.create_process()
+            process = await conn.create_process(term_type='xterm-256color', encoding='utf-8')
             await asyncio.wait([
                 asyncio.create_task(_proxy_websocket_to_ssh(websocket, process, f)),
                 asyncio.create_task(_proxy_ssh_to_websocket(websocket, process, f))
