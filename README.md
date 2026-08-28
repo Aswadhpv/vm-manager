@@ -297,6 +297,7 @@ ssh -L 8000:localhost:8000 apv@192.168.1.187
 | `/playbooks/{name}`  | DELETE | Delete an Ansible playbook                          |
 | `/ansible/auth`      | POST   | Post the auth password or sudo password if user has |
 | `/ansible/clear`     | POST   | Recover the auth password if user forget            |
+|----------------------|--------|-----------------------------------------------------|
 
 ---
 
